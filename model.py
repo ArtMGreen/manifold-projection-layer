@@ -6,10 +6,12 @@ from torchvision.models import ResNet18_Weights
 class ProjHead(nn.Module):
     def __init__(self, in_dim, proj_dim):
         super().__init__()
-        self.fc = nn.Linear(in_dim, proj_dim)
+        # Add weight normalization to prevent collapse
+        self.fc = nn.utils.parametrizations.weight_norm(nn.Linear(in_dim, proj_dim))
 
     def forward(self, x):
         z_prime = self.fc(x)
+        # Normalize by dimension to make energy scale-invariant
         energy = torch.mean(z_prime ** 2, dim=1, keepdim=True)
         return z_prime, energy
 
