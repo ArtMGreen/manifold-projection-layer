@@ -13,15 +13,17 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # Configuration
+import torch
+
 epsilon_energy = 5.0
 delta_energy = 5.0
-lambda_energy = 0.5  # Increased from 0.25 to prevent energy collapse
-alpha_fgsm = 8 / 255
+lambda_energy = 0
+alpha_fgsm = 8 / 256
 
 num_classes = 10
-batch_size = 64  # Increased for faster training
-epochs = 10
-lr = 0.001  # Increased from 0.005 for better training
+batch_size = 16
+epochs = 3
+lr = 0.01
 if torch.cuda.is_available():
     device = 'cuda'
 elif torch.backends.mps.is_available():
@@ -29,13 +31,15 @@ elif torch.backends.mps.is_available():
 else:
     device = 'cpu'
 
-# Normalization parameters for ResNet18 preprocessing
+# Normalization parameters for ResNet18 trained on ImageNet1K_V1 only!!
+# TODO: automated mean and std computation depending on the dataset
 IMAGENET_MEAN = [0.485, 0.456, 0.406]
 IMAGENET_STD = [0.229, 0.224, 0.225]
 
-# Calculate bounds for normalized images
-NORM_MIN = torch.tensor([(0 - m) / s for m, s in zip(IMAGENET_MEAN, IMAGENET_STD)])
-NORM_MAX = torch.tensor([(1 - m) / s for m, s in zip(IMAGENET_MEAN, IMAGENET_STD)])
+# [0, 1] -> [PIXEL_MIN, PIXEL_MAX]
+# Note: each color channel has a different legal range
+PIXEL_MIN = torch.tensor([(0 - m) / s for m, s in zip(IMAGENET_MEAN, IMAGENET_STD)])
+PIXEL_MAX = torch.tensor([(1 - m) / s for m, s in zip(IMAGENET_MEAN, IMAGENET_STD)])
 
 print(f"Using device: {device}")
 
@@ -56,52 +60,51 @@ train_dataset = CIFAR10(root='./data', train=True, transform=resnet18_preprocess
 pin_memory = True if device == 'cuda' else False
 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=pin_memory)
 
-# Attack and loss functions
+
 def fgsm_attack(model, x, y, loss_fn, alpha):
-    # Store current training state
     was_training = model.training
     model.eval()
-    
+
     x_adv = x.detach().clone().requires_grad_(True)
     logits, _ = model(x_adv)
     loss = loss_fn(logits, y)
     loss.backward()
-    x_adv = x_adv + alpha * x_adv.grad.sign()
-    
-    # Clamp to correct bounds based on normalization
-    min_vals = NORM_MIN.to(x_adv.device).view(1, 3, 1, 1).expand_as(x_adv)
-    max_vals = NORM_MAX.to(x_adv.device).view(1, 3, 1, 1).expand_as(x_adv)
+
+    min_vals = PIXEL_MIN.to(x_adv.device).view(1, 3, 1, 1).expand_as(x_adv)
+    max_vals = PIXEL_MAX.to(x_adv.device).view(1, 3, 1, 1).expand_as(x_adv)
+
+    ranges = max_vals - min_vals
+
+    x_adv = x_adv + alpha * ranges * x_adv.grad.sign()
     x_adv = torch.clamp(x_adv, min_vals, max_vals)
-    
-    # Restore training state
+
     if was_training:
         model.train()
-        
+
     return x_adv.detach()
 
-def compute_loss(model, x, y, loss_fn, epsilon, delta, lambda_energy, use_lower_boundary=True, use_upper_boundary=True):
+
+def compute_loss(model, x, y, loss_fn, epsilon, delta, lambda_energy, use_lower_boundary, use_upper_boundary):
     logits_clean, energy_clean = model(x)
     loss_clean = loss_fn(logits_clean, y, reduction="mean")
+    # model.eval() is called inside fgsm_attack()
     x_adv = fgsm_attack(model, x, y, loss_fn, alpha_fgsm)
-    model.train()
+    # model.train() is called inside fgsm_attack() if the original state was training
     logits_adv, energy_adv = model(x_adv)
     loss_adv = loss_fn(logits_adv, y, reduction="mean")
 
-    loss_energy = 0
+    loss_energy = torch.tensor(0)
     if lambda_energy != 0:
-        # Lower boundary term (yellow ReLU)
-        lower_term = energy_clean - epsilon
+        E_clean_penalty = energy_clean - epsilon
         if use_lower_boundary:
-            lower_term = F.relu(lower_term)
-        
-        # Upper boundary term (green ReLU)
-        upper_term = epsilon + delta - energy_adv
+            E_clean_penalty = F.relu(E_clean_penalty)
+
+        E_adv_penalty = epsilon + delta - energy_adv
         if use_upper_boundary:
-            upper_term = F.relu(upper_term)
-        
-        # Correct reduction: first mean over batch, then scale by lambda
-        energy_terms = (lower_term + upper_term).mean()
-        loss_energy = lambda_energy * energy_terms
+            E_adv_penalty = F.relu(E_adv_penalty)
+
+        energy_terms = (E_clean_penalty + E_adv_penalty).mean(dim=0)  # mean over batch
+        loss_energy = lambda_energy * energy_terms.mean()
 
     total_loss = loss_clean + loss_adv + loss_energy
 
