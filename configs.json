@@ -1,0 +1,52 @@
+{
+  "experiments": [
+    {
+      "name": "with_boundaries",
+      "epsilon_energy": 5.0,
+      "delta_energy": 5.0,
+      "lambda_energy": 0.5,
+      "use_lower_boundary": true,
+      "use_upper_boundary": true,
+      "lr": 0.001,
+      "batch_size": 64,
+      "epochs": 10,
+      "alpha_fgsm": 0.03137
+    },
+    {
+      "name": "no_boundaries",
+      "epsilon_energy": 5.0,
+      "delta_energy": 5.0,
+      "lambda_energy": 0.5,
+      "use_lower_boundary": false,
+      "use_upper_boundary": false,
+      "lr": 0.001,
+      "batch_size": 64,
+      "epochs": 10,
+      "alpha_fgsm": 0.03137
+    },
+    {
+      "name": "higher_lambda",
+      "epsilon_energy": 5.0,
+      "delta_energy": 5.0,
+      "lambda_energy": 1.0,
+      "use_lower_boundary": true,
+      "use_upper_boundary": true,
+      "lr": 0.001,
+      "batch_size": 64,
+      "epochs": 10,
+      "alpha_fgsm": 0.03137
+    },
+    {
+      "name": "no_energy_loss",
+      "epsilon_energy": 5.0,
+      "delta_energy": 5.0,
+      "lambda_energy": 0.0,
+      "use_lower_boundary": true,
+      "use_upper_boundary": true,
+      "lr": 0.001,
+      "batch_size": 64,
+      "epochs": 10,
+      "alpha_fgsm": 0.03137
+    }
+  ]
+}
