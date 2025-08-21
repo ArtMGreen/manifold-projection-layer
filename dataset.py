@@ -1,16 +1,27 @@
 from torch.utils.data import Dataset
 from torchvision.io import decode_image, ImageReadMode
+from download_CIFAR10 import extract_cifar10_as_images
+
 import os
 import glob
 
+# The params here are for ImageNetV1_1K, for CIFAR-10 see below
+# IMAGENET_MEAN = [0.485, 0.456, 0.406]
+# IMAGENET_STD = [0.229, 0.224, 0.225]
+
 
 class CIFAR10(Dataset):
-    def __init__(self, root, train=True, transform=None):
+    MEAN = [0.4914, 0.4822, 0.4465]
+    STD = [0.2470, 0.2435, 0.2616]
+    
+    def __init__(self, root, include_classes, train=True, transform=None):
+        extract_cifar10_as_images()
+        
         split = "train" if train else "test"
         self.samples = []
         base_dir = os.path.join(root, "cifar10-images", split)
 
-        for class_id in range(10):
+        for class_id in include_classes:
             class_dir = os.path.join(base_dir, str(class_id))
             for img_path in glob.glob(os.path.join(class_dir, "*.png")):
                 self.samples.append((img_path, class_id))
