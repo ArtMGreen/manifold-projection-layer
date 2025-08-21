@@ -3,7 +3,7 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 import numpy as np
 
-from adversaries import fgsm_attack
+from adversaries import FGSM_attack
 
 from config import DEVICE
 from config import EVAL_FGSM_ALPHA
@@ -28,7 +28,7 @@ def results_and_energy(model, loader):
         clean_results = (preds_clean == y).to(int)
         all_clean_res.append(clean_results.detach().cpu())
 
-        x_adv = fgsm_attack(model, x, y, EVAL_FGSM_ALPHA)
+        x_adv = FGSM_attack(model, x, y, EVAL_FGSM_ALPHA)
         
         logits_adv, energy_adv = model(x_adv)
         all_adv_E.append(energy_adv.detach().cpu())
@@ -42,6 +42,17 @@ def results_and_energy(model, loader):
     all_adv_res = torch.cat(all_adv_res).squeeze().numpy()
     return all_clean_E, all_adv_E, all_clean_res, all_adv_res
 
+
+def energy(model, loader):
+    model.eval()
+    all_E = list()
+    for x, y in tqdm(loader, total=len(loader), desc="Evaluating"):
+        x, y = x.to(DEVICE), y.to(DEVICE)
+        logits, energy = model(x)
+        all_E.append(energy.detach().cpu())
+    all_E = torch.cat(all_E).squeeze().numpy()
+    return all_E
+    
 
 def evaluate_at_threshold(energy, results, reject_lower_than_threshold=False):
     total = len(results)
