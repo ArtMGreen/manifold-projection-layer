@@ -22,7 +22,7 @@ class ProjHead(nn.Module):
 class ResNet18EnergyAlong(nn.Module):
     def __init__(self, num_classes):
         super().__init__()
-        backbone = models.resnet18(weights=ResNet18_Weights.IMAGENET1K_V1)
+        backbone = models.resnet18(norm_layer=nn.InstanceNorm2d)
         backbone.fc = nn.Identity()
         self.model_backbone = backbone
         self.proj_head = ProjHead(512, 512, 512)
@@ -37,7 +37,7 @@ class ResNet18EnergyAlong(nn.Module):
 class ResNet18EnergyParallel(nn.Module):
     def __init__(self, num_classes):
         super().__init__()
-        backbone = models.resnet18(weights=ResNet18_Weights.IMAGENET1K_V1)
+        backbone = models.resnet18(norm_layer=nn.InstanceNorm2d)
         backbone.fc = nn.Identity()
         self.model_backbone = backbone
         self.proj_head = ProjHead(512, 512, 512)

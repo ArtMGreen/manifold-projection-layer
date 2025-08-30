@@ -3,13 +3,12 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 import numpy as np
 
-from adversaries import FGSM_attack
-
 from config import DEVICE
-from config import EVAL_FGSM_ALPHA
+from config import EVAL_ADVERSARY
 
-def results_and_energy(model, loader):
-    model.eval()
+def results_and_energy(model, loader, set_to_eval=True):
+    if set_to_eval:
+        model.eval()
 
     all_clean_E = list()
     all_adv_E = list()
@@ -28,7 +27,7 @@ def results_and_energy(model, loader):
         clean_results = (preds_clean == y).to(int)
         all_clean_res.append(clean_results.detach().cpu())
 
-        x_adv = FGSM_attack(model, x, y, EVAL_FGSM_ALPHA)
+        x_adv = EVAL_ADVERSARY.attack(model, x, y)
         
         logits_adv, energy_adv = model(x_adv)
         all_adv_E.append(energy_adv.detach().cpu())
